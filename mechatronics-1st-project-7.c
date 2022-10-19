@@ -30,6 +30,9 @@ float errorPosition = 0;
 unsigned int checkTime;
 unsigned int checkTimeBefore;
 
+int trialNum = 0;
+
+// Functions
 void funcEncoderA() {
 	encA = digitalRead(ENCODERA);
 	encB = digitalRead(ENCODERB);
@@ -76,11 +79,28 @@ void funcEncoderB() {
 	printf("errPos: %f\n", errorPosition);
 }
 
+// Main Function
 int main(void) {
+    // Input Test Conditions
+    printf("총 시행 횟수를 입력하세요: ");
+    scanf_s("%d", &trialNum);
+    printf("\n");
 
+    int trialArr[trialNum];
+
+    for (int i = 0; i < trialNum; i++) {
+        printf("%d번째 시행의 목표 위치를 입력하세요: ", (i + 1));
+        scanf_s("%d", &trialArr[i]);
+        printf("\n");
+    }
+
+    // Set-up
 	wiringPiSetupGpio();
+
 	pinMode(ENCODERA, INPUT);
 	pinMode(ENCODERB, INPUT);
+
+    pinMode(PULSE, INPUT);
 
 	softPwmCreate(MOTOR1, 0, 100);
 	softPwmCreate(MOTOR2, 0, 100);
@@ -88,6 +108,7 @@ int main(void) {
 	wiringPiISR(ENCODERA, INT_EDGE_BOTH, funcEncoderA);
 	wiringPiISR(ENCODERB, INT_EDGE_BOTH, funcEncoderB);
 
+    // PID Control
 	errorPosition = referencePosition - redGearPosition;
 
 	checkTimeBefore = millis();
