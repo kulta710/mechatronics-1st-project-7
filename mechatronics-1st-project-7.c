@@ -3,17 +3,20 @@
 #include <softPwm.h>
 
 // Define
-#define LOOPTIME 5
-
 #define ENCODERA 17
 #define ENCODERB 27
 
 #define MOTOR1 19
 #define MOTOR2 26
 
+#define PULSE 18
+
+#define LOOPTIME 5
 #define ENC2REDGEAR 216
 
-#define PGAIN 10
+#define PGAIN 100
+#define IGAIN 10
+#define DGAIN 1
 
 // Variables
 int encA;
