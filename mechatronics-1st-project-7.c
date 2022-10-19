@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <wiringPi.h>
 #include <softPwm.h>
 
@@ -26,11 +27,25 @@ float redGearPosition = 0;
 
 float referencePosition = 10;
 float errorPosition = 0;
+float pid = 0;
 
 unsigned int checkTime;
 unsigned int checkTimeBefore;
 
+int pulse;
+
 int trialNum = 0;
+
+int trialIndex = 0;
+
+int loop = 0;
+
+int beforeErrorPosition = 0;
+int bbeforeErrorPosition = 0;
+
+float itae = 0;
+
+unsigned int startTime = 0;
 
 // Functions
 void funcEncoderA() {
@@ -82,15 +97,15 @@ void funcEncoderB() {
 // Main Function
 int main(void) {
     // Input Test Conditions
-    printf("총 시행 횟수를 입력하세요: ");
-    scanf_s("%d", &trialNum);
+    printf("Repitition: ");
+    scanf("%d", &trialNum);
     printf("\n");
 
     int trialArr[trialNum];
 
     for (int i = 0; i < trialNum; i++) {
-        printf("%d번째 시행의 목표 위치를 입력하세요: ", (i + 1));
-        scanf_s("%d", &trialArr[i]);
+        printf("Number %d Target Position: ", (i + 1));
+        scanf("%d", &trialArr[i]);
         printf("\n");
     }
 
@@ -109,28 +124,64 @@ int main(void) {
 	wiringPiISR(ENCODERB, INT_EDGE_BOTH, funcEncoderB);
 
     // PID Control
-	errorPosition = referencePosition - redGearPosition;
 
+    
 	checkTimeBefore = millis();
+
+    
 
 	while (1) {
 		checkTime = millis();
 
 		if (checkTime - checkTimeBefore > LOOPTIME) {
+
+            pulse = digitalRead(PULSE);
+
+            if (pulse == 1) {
+                startTime = millis();
+
+                referencePosition = trialArr[trialIndex];
+
+                loop = 0; trialIndex++;
+            }
+
+            errorPosition = referencePosition - redGearPosition;
+
+            if (loop == 0) {
+                beforeErrorPosition = referencePosition - redGearPosition;
+                bbeforeErrorPosition = referencePosition - redGearPosition;
+            }
+
+            pid = (PGAIN + IGAIN * LOOPTIME + DGAIN / LOOPTIME) * errorPosition - (PGAIN + 2 * DGAIN / LOOPTIME) * beforeErrorPosition + (DGAIN / LOOPTIME) * bbeforeErrorPosition;
+
 			if (errorPosition > 0) {
-				softPwmWrite(MOTOR1, errorPosition * PGAIN);
+				
+                
+                softPwmWrite(MOTOR1, pid);
 				softPwmWrite(MOTOR2, 0);
+
+                bbeforeErrorPosition = beforeErrorPosition;
+                beforeErrorPosition = errorPosition;
+
+                itae += (checkTime - startTime) * errorPosition * LOOPTIME;
 
 				// printf("errPos > 0, gearPos: %f\n", redGearPosition);
 			}
 			else {
-				softPwmWrite(MOTOR2, errorPosition * PGAIN);
+				softPwmWrite(MOTOR2, -pid);
 				softPwmWrite(MOTOR1, 0);
+
+                bbeforeErrorPosition = beforeErrorPosition;
+                beforeErrorPosition = errorPosition;
+
+                itae += (checkTime - startTime) * errorPosition * LOOPTIME;
 
 				// printf("errPos < 0, gearPos: %f\n", redGearPosition);
 			}
 
 			checkTimeBefore = checkTime;
+
+            printf("%f\n", itae);
 		}
 	}
 
