@@ -128,16 +128,24 @@ int main(void) {
     
 	checkTimeBefore = millis();
 
-    
+    int flag = 1;
 
 	while (1) {
 		checkTime = millis();
 
 		if (checkTime - checkTimeBefore > LOOPTIME) {
 
-            pulse = digitalRead(PULSE);
+			loop++;
 
-            if (pulse == 1) {
+            pulse = digitalRead(PULSE);
+            
+            if (pulse == 0) {
+				flag = 1;
+			}
+
+            if (pulse == 1 && flag == 1) {
+				flag = 0;
+				
                 startTime = millis();
 
                 referencePosition = trialArr[trialIndex];
@@ -168,7 +176,7 @@ int main(void) {
 				// printf("errPos > 0, gearPos: %f\n", redGearPosition);
 			}
 			else {
-				softPwmWrite(MOTOR2, -pid);
+				softPwmWrite(MOTOR2, pid);
 				softPwmWrite(MOTOR1, 0);
 
                 bbeforeErrorPosition = beforeErrorPosition;
@@ -181,7 +189,7 @@ int main(void) {
 
 			checkTimeBefore = checkTime;
 
-            printf("%f\n", itae);
+            printf("%f, %d\n", itae, pulse);
 		}
 	}
 
