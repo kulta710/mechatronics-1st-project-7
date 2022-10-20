@@ -1,9 +1,14 @@
+//////////////////////////////////////////////////
+// Include
+//////////////////////////////////////////////////
 #include <stdio.h>
 #include <stdlib.h>
 #include <wiringPi.h>
 #include <softPwm.h>
 
+//////////////////////////////////////////////////
 // Define
+//////////////////////////////////////////////////
 #define ENCODERA 17
 #define ENCODERB 27
 
@@ -13,41 +18,44 @@
 #define PULSE 18
 
 #define LOOPTIME 5
+#define ESCAPETIME 3000
+
 #define ENC2REDGEAR 216
 
-#define PGAIN 100
+#define PGAIN 80
 #define IGAIN 10
 #define DGAIN 1
 
+//////////////////////////////////////////////////
 // Variables
-int encA;
-int encB;
+//////////////////////////////////////////////////
+int encA = 0;
+int encB = 0;
+int pulse = 0;
+
 int encoderPosition = 0;
+float referencePosition = 0;
 float redGearPosition = 0;
 
-float referencePosition = 10;
 float errorPosition = 0;
-float pid = 0;
-
-unsigned int checkTime;
-unsigned int checkTimeBefore;
-
-int pulse;
+float beforeErrorPosition = 0;
+float bbeforeErrorPosition = 0;
 
 int trialNum = 0;
-
 int trialIndex = 0;
+int loopIndex = 0;
 
-int loop = 0;
+unsigned int startTime = 0;
+unsigned int checkTime = 0;
+unsigned int checkTimeBefore = 0;
 
-int beforeErrorPosition = 0;
-int bbeforeErrorPosition = 0;
+float pid = 0;
 
 float itae = 0;
 
-unsigned int startTime = 0;
-
+//////////////////////////////////////////////////
 // Functions
+//////////////////////////////////////////////////
 void funcEncoderA() {
 	encA = digitalRead(ENCODERA);
 	encB = digitalRead(ENCODERB);
@@ -63,12 +71,10 @@ void funcEncoderA() {
 
 	redGearPosition = (float)encoderPosition / ENC2REDGEAR;
 
-	printf("funcEncoderA() A: %d B: %d encPos: %d gearPos: %f\n",
-		encA, encB, encoderPosition, redGearPosition);
-
-	errorPosition = referencePosition - redGearPosition;
-
-	printf("errPos: %f\n", errorPosition);
+	printf(
+        "funcEncoderA() A: %d B: %d encPos: %d gearPos: %f\n",
+		encA, encB, encoderPosition, redGearPosition
+    );
 }
 
 void funcEncoderB() {
@@ -86,15 +92,15 @@ void funcEncoderB() {
 
 	redGearPosition = (float)encoderPosition / ENC2REDGEAR;
 
-	printf("funcEncoderB() A: %d B: %d encPos: %d gearPos: %f\n",
-		encA, encB, encoderPosition, redGearPosition);
-
-	errorPosition = referencePosition - redGearPosition;
-
-	printf("errPos: %f\n", errorPosition);
+	printf(
+        "funcEncoderB() A: %d B: %d encPos: %d gearPos: %f\n",
+		encA, encB, encoderPosition, redGearPosition
+    );
 }
 
+//////////////////////////////////////////////////
 // Main Function
+//////////////////////////////////////////////////
 int main(void) {
     // Input Test Conditions
     printf("Repitition: ");
@@ -104,7 +110,7 @@ int main(void) {
     int trialArr[trialNum];
 
     for (int i = 0; i < trialNum; i++) {
-        printf("Number %d Target Position: ", (i + 1));
+        printf("Target Position at Trial %d: ", (i + 1));
         scanf("%d", &trialArr[i]);
         printf("\n");
     }
@@ -124,74 +130,112 @@ int main(void) {
 	wiringPiISR(ENCODERB, INT_EDGE_BOTH, funcEncoderB);
 
     // PID Control
-
-    
-	checkTimeBefore = millis();
-
-    int flag = 1;
-
-	while (1) {
-		checkTime = millis();
-
-		if (checkTime - checkTimeBefore > LOOPTIME) {
-
-			loop++;
-
+    // 입력받은 횟수 실행
+    for(trialIndex = 0; trialIndex < trialNum; trialIndex++) {           
+        // 신호대기
+        while(1){
             pulse = digitalRead(PULSE);
-            
-            if (pulse == 0) {
-				flag = 1;
-			}
+            // Pulse check
+            // printf("pulse signal : %d\n ", pulse);
 
-            if (pulse == 1 && flag == 1) {
-				flag = 0;
-				
-                startTime = millis();
+            if(pulse == 1){
+                printf("pront break\n");
+                break;
+            }
+        }
 
+        startTime = millis();
+	    checkTimeBefore = millis();
+
+        loopIndex = 0;
+	
+        // while문 탈출을 위해 시간제한 설정 (Time_for_escape)
+        while(1){
+		    checkTime = millis();
+		    Time_for_escape = millis();
+		
+            if ((checkTime - checkTimeBefore > LOOPTIME)) {    //동시만족 시 진행
                 referencePosition = trialArr[trialIndex];
 
-                loop = 0; trialIndex++;
-            }
+                errorPosition = referencePosition - redGearPosition;
 
-            errorPosition = referencePosition - redGearPosition;
+                // 초기값 설정
+                if (loopIndex == 0) {
+                    // pid 초기화
+                    pid = 0;
 
-            if (loop == 0) {
-                beforeErrorPosition = referencePosition - redGearPosition;
-                bbeforeErrorPosition = referencePosition - redGearPosition;
-            }
+                    // P-control
+                    pid += errorPosition * PGAIN;
 
-            pid = (PGAIN + IGAIN * LOOPTIME + DGAIN / LOOPTIME) * errorPosition - (PGAIN + 2 * DGAIN / LOOPTIME) * beforeErrorPosition + (DGAIN / LOOPTIME) * bbeforeErrorPosition;
+                    // I-control
+                    pid += errorPosition * IGAIN * LOOPTIME;
 
-			if (errorPosition > 0) {
-				
-                
-                softPwmWrite(MOTOR1, pid);
-				softPwmWrite(MOTOR2, 0);
+                    // D-control
+                    pid += errorPosition * DGAIN / LOOPTIME;
 
-                bbeforeErrorPosition = beforeErrorPosition;
-                beforeErrorPosition = errorPosition;
+                    beforeErrorPosition = errorPosition;
+                    bbeforeErrorPosition = 0;
+                } else if (loopIndex == 1) {
+                    // pid 초기화
+                    pid = 0;
 
-                itae += (checkTime - startTime) * errorPosition * LOOPTIME;
+                    // P-control
+                    pid += errorPosition * PGAIN;
 
-				// printf("errPos > 0, gearPos: %f\n", redGearPosition);
+                    // I-control
+                    pid += (errorPosition + beforeErrorPosition) * IGAIN * LOOPTIME;
+
+                    // D-control
+                    pid += (errorPosition - beforeErrorPosition) * DGAIN / LOOPTIME;
+
+                    beforeErrorPosition = errorPosition;
+                    bbeforeErrorPosition = beforeErrorPosition;
+                } else {
+                    // pid 계산
+                    pid += (PGAIN + IGAIN * LOOPTIME + DGAIN / LOOPTIME) * errorPosition;
+                    pid -= (PGAIN + 2 * DGAIN / LOOPTIME) * beforeErrorPosition;
+                    pid += (DGAIN / LOOPTIME) * bbeforeErrorPosition;
+
+                    // 다음 진행을 위한
+                    beforeErrorPosition = errorPosition;
+                    bbeforeErrorPosition = beforeErrorPosition;
+                }
+
+			    if (errorPosition > 0) {
+                    softPwmWrite(MOTOR1, pid);
+				    softPwmWrite(MOTOR2, 0);
+
+                    itae += (checkTime - startTime) * errorPosition * LOOPTIME;
+
+				    // printf("errPos > 0, gearPos: %f\n", redGearPosition);
+		        } else {
+				    softPwmWrite(MOTOR2, pid);
+				    softPwmWrite(MOTOR1, 0);
+
+                    itae += (checkTime - startTime) * (-1) * errorPosition * LOOPTIME;
+
+				    // printf("errPos < 0, gearPos: %f\n", redGearPosition);
+			    }
+
+		        checkTimeBefore = checkTime;
+                loopIndex++;
+
+		        // printf("%f\n", itae);
+		    }
+            
+            if (checkTime - startTime >= ESCAPETIME) {
+			    printf("Time for escape: %d\n", checkTime);
+
+                loopIndex = 0;
+			    
+                break;
 			}
-			else {
-				softPwmWrite(MOTOR2, pid);
-				softPwmWrite(MOTOR1, 0);
-
-                bbeforeErrorPosition = beforeErrorPosition;
-                beforeErrorPosition = errorPosition;
-
-                itae += (checkTime - startTime) * errorPosition * LOOPTIME;
-
-				// printf("errPos < 0, gearPos: %f\n", redGearPosition);
-			}
-
-			checkTimeBefore = checkTime;
-
-            printf("%f, %d\n", itae, pulse);
 		}
+		
+        // 시행 회차 표시
+		printf("Complete Trial Number %d\n", trialIndex + 1);
+        printf("ITAE Value: %f", itae);
 	}
 
-	return 0;
+    return 0;
 }
