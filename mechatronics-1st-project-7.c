@@ -156,7 +156,7 @@ int main(void) {
 
         loopIndex = 0;
 	
-        // while문 탈출을 위해 시간제한 설정 (Time_for_escape)
+        // while문 탈출을 위해 시간제한 설정
         while(1) {
 		    checkTime = millis();
 		    Time_for_escape = millis();
