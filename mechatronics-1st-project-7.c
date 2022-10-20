@@ -103,7 +103,8 @@ void funcEncoderB() {
 //////////////////////////////////////////////////
 int main(void) {
     // Input Test Conditions
-    printf("Repitition: ");
+    printf("===== Program Start =====\n");
+    printf("Trial Number: ");
     scanf("%d", &trialNum);
     printf("\n");
 
@@ -132,25 +133,31 @@ int main(void) {
     // PID Control
     // 입력받은 횟수 실행
     for(trialIndex = 0; trialIndex < trialNum; trialIndex++) {           
+        
         // 신호대기
+        printf("Receiving Transmission...\n");
+
         while(1){
             pulse = digitalRead(PULSE);
-            // Pulse check
-            // printf("pulse signal : %d\n ", pulse);
 
-            if(pulse == 1){
-                printf("pront break\n");
+            // Pulse Check
+            // printf("Pulse Signal : %d\n ", pulse);
+
+            if (pulse == 1) {
                 break;
             }
         }
 
+        // 매회 시작 출력, 초기화
         startTime = millis();
 	    checkTimeBefore = millis();
+
+        printf("----- Start %d Trial at %d -----\n", trialIndex + 1, startTime);
 
         loopIndex = 0;
 	
         // while문 탈출을 위해 시간제한 설정 (Time_for_escape)
-        while(1){
+        while(1) {
 		    checkTime = millis();
 		    Time_for_escape = millis();
 		
@@ -232,9 +239,9 @@ int main(void) {
 			}
 		}
 		
-        // 시행 회차 표시
+        // 매회 결과 출력
 		printf("Complete Trial Number %d\n", trialIndex + 1);
-        printf("ITAE Value: %f", itae);
+        printf("Current ITAE Value: %f\n", itae);
 	}
 
     return 0;
